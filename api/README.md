@@ -31,6 +31,36 @@ This directory contains the complete Python backend for the Bubblebot Framework,
    pip install -r requirements-dev.txt
    ```
 
+## 🏃‍♂️ Development Scripts
+
+The project includes convenient scripts for common development tasks:
+
+### **Start the API Server:**
+```bash
+./start_server.sh
+```
+- Automatically activates virtual environment
+- Starts FastAPI server with auto-reload
+- Runs on http://localhost:8000
+
+### **Stop the API Server:**
+```bash
+./stop_server.sh
+```
+- Kills any running server instances
+- Useful if you get "port already in use" errors
+
+### **Run Tests:**
+```bash
+./run_tests.sh                    # Run all tests
+./run_tests.sh -v                 # Run with verbose output
+./run_tests.sh -c                 # Run with coverage report
+./run_tests.sh -c -h              # Run with coverage + HTML report
+./run_tests.sh --help             # Show all options
+```
+
+For detailed testing information, see [tests/README.md](tests/README.md).
+
 ## 🏗️ Development
 
 ### Code Quality Tools
@@ -78,6 +108,9 @@ api/
 │   ├── test_document_processor.py
 │   └── __init__.py
 ├── notebooks/             # Jupyter notebooks for demos
+├── start_server.sh        # Server startup script
+├── stop_server.sh         # Server shutdown script
+├── run_tests.sh           # Test runner script
 ├── requirements.txt       # Production dependencies
 ├── requirements-dev.txt   # Development dependencies
 └── README.md             # This file
@@ -100,17 +133,7 @@ MAX_FILE_SIZE_MB=10
 
 For comprehensive testing information, see [tests/README.md](tests/README.md).
 
-Quick test commands:
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app
-
-# Run specific test file
-pytest tests/test_document_processor.py
-```
+**Quick start:** Use the `./run_tests.sh` script for all testing needs.
 
 ## 🤝 Contributing
 
