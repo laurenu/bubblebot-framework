@@ -15,7 +15,26 @@ This directory contains all tests for the Bubblebot API backend.
 - Virtual environment activated
 - Development dependencies installed: `pip install -r requirements-dev.txt`
 
-### Running All Tests
+### 🎯 Recommended: Use the Test Runner Script
+
+For most testing needs, use the convenient `run_tests.sh` script from the api directory:
+
+```bash
+# From the api directory
+./run_tests.sh                    # Run all tests
+./run_tests.sh -v                 # Run with verbose output
+./run_tests.sh -c                 # Run with coverage report
+./run_tests.sh -c -h              # Run with coverage + HTML report
+./run_tests.sh -f test_document_processor.py  # Run specific file
+./run_tests.sh -k 'document_type'             # Run tests matching pattern
+./run_tests.sh --help             # Show all options
+```
+
+The script automatically handles virtual environment activation and provides a user-friendly interface for common testing scenarios.
+
+### Running All Tests (Manual Commands)
+
+If you prefer to run pytest directly:
 
 ```bash
 # Run all tests
@@ -47,6 +66,8 @@ pytest tests/test_document_processor.py::TestDocumentProcessor::test_document_ty
 pytest -k "document_type"
 ```
 
+**Note:** Many of these commands can also be run using the `./run_tests.sh` script with appropriate flags.
+
 ### Running Tests with Different Options
 
 ```bash
@@ -75,6 +96,8 @@ pytest --cov=app --cov-report=html
 # Generate XML coverage report (for CI/CD)
 pytest --cov=app --cov-report=xml
 ```
+
+**Note:** The `./run_tests.sh -c -h` command provides an easy way to generate coverage reports.
 
 ## 🐛 Debugging Tests
 

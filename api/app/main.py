@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 import tempfile
 from typing import List, Dict, Any
+from datetime import datetime
 
 from app.services.document_processor import DocumentProcessor, ProcessingResult
 
@@ -66,7 +67,7 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "timestamp": "2024-01-01T00:00:00Z",  # In real app, use actual timestamp
+        "timestamp": datetime.utcnow().isoformat() + "Z",
         "services": {
             "document_processor": "operational",
             "database": "not_connected",  # Will be implemented in later days
