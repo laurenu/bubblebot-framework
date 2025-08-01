@@ -30,6 +30,8 @@ This directory contains the complete Python backend for the Bubblebot Framework,
    # For development (includes testing tools)
    pip install -r requirements-dev.txt
    ```
+   
+   **Note:** The development scripts automatically handle virtual environment activation, so you only need to install dependencies once during setup.
 
 ## 🏃‍♂️ Development Scripts
 
