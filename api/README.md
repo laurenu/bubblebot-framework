@@ -1,0 +1,129 @@
+# Bubblebot API 🫧
+
+This directory contains the complete Python backend for the Bubblebot Framework, including document processing services, models, utilities, and API endpoints.
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.8 or higher
+- pip (Python package installer)
+
+### Installation
+
+1. **Navigate to the API directory:**
+   ```bash
+   cd api
+   ```
+
+2. **Create a virtual environment (recommended):**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   # For production
+   pip install -r requirements.txt
+   
+   # For development (includes testing tools)
+   pip install -r requirements-dev.txt
+   ```
+
+## 🏗️ Development
+
+### Code Quality Tools
+
+The project includes several code quality tools:
+
+```bash
+# Format code with Black
+black app/ tests/
+
+# Sort imports with isort
+isort app/ tests/
+
+# Lint code with flake8
+flake8 app/ tests/
+
+# Type checking with mypy
+mypy app/
+```
+
+### Pre-commit Hooks
+
+If you have pre-commit installed, it will automatically run these tools:
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run all hooks manually
+pre-commit run --all-files
+```
+
+## 📁 Project Structure
+
+```
+api/
+├── app/                    # Main application code
+│   ├── api/               # API endpoints
+│   ├── core/              # Core functionality
+│   ├── models/            # Data models
+│   ├── services/          # Business logic services
+│   └── utils/             # Utility functions
+├── tests/                 # Test files
+│   ├── README.md          # Testing guide
+│   ├── test_document_processor.py
+│   └── __init__.py
+├── notebooks/             # Jupyter notebooks for demos
+├── requirements.txt       # Production dependencies
+├── requirements-dev.txt   # Development dependencies
+└── README.md             # This file
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Create a `.env` file in the api directory for local development:
+
+```bash
+# Example .env file
+DEBUG=True
+LOG_LEVEL=INFO
+MAX_FILE_SIZE_MB=10
+```
+
+## 🧪 Testing
+
+For comprehensive testing information, see [tests/README.md](tests/README.md).
+
+Quick test commands:
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app
+
+# Run specific test file
+pytest tests/test_document_processor.py
+```
+
+## 🤝 Contributing
+
+When contributing to the backend:
+
+1. Follow the existing code style and patterns
+2. Add appropriate tests for new functionality
+3. Update documentation as needed
+4. Ensure all code quality checks pass
+5. Use type hints and docstrings for clarity
+
+## 📚 Additional Resources
+
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Python Best Practices](https://realpython.com/python-best-practices/)
+- [Testing Guide](tests/README.md) 
