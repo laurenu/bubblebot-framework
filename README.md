@@ -14,6 +14,9 @@ bubblebot-framework/
 │   ├── app/              # Main application code
 │   ├── tests/            # Backend tests
 │   ├── notebooks/        # Jupyter demos
+│   ├── start_server.sh   # Server startup script
+│   ├── stop_server.sh    # Server shutdown script
+│   ├── run_tests.sh      # Test runner script
 │   └── README.md         # Backend documentation
 ├── web/                  # Frontend web application (coming soon)
 │   └── src/              # Frontend source code
@@ -27,12 +30,12 @@ bubblebot-framework/
 
 ### Backend API
 
-TBD
+The Bubblebot API provides document processing, AI integration, and multi-tenant chatbot functionality.
 
 **Getting Started:**
 ```bash
 cd api
-pip install -r requirements-dev.txt
+./start_server.sh          # Start the API server
 ```
 
 **For detailed backend documentation, see [api/README.md](api/README.md)**
@@ -51,14 +54,13 @@ The API backend includes comprehensive test suites for all functionality.
 
 **For detailed testing information, see [api/tests/README.md](api/tests/README.md)**
 
-Quick test commands:
+**Quick test commands:**
 ```bash
 cd api
-pytest                    # Run all tests
-pytest --cov=app         # Run with coverage
+./run_tests.sh             # Run all tests
+./run_tests.sh -c          # Run with coverage
+./run_tests.sh --help      # Show all options
 ```
-
-
 
 ## 📚 Documentation
 
