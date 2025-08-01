@@ -347,11 +347,12 @@ class TestDocumentProcessorIntegration:
             for filename, content in documents:
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
                     f.write(content)
+                    f.flush()
                     temp_file = Path(f.name)
                     temp_files.append(temp_file)
-                    
-                    result = await processor.process_file(temp_file, f"tenant_{filename}")
-                    results.append(result)
+                
+                result = await processor.process_file(temp_file, f"tenant_{filename}")
+                results.append(result)
             
             # Generate and verify stats
             stats = processor.get_processing_stats(results)
