@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
-import PyPDF2
+from pypdf import PdfReader
 from docx import Document as DocxDocument
 import aiofiles
 
@@ -205,7 +205,7 @@ class DocumentProcessor:
         """Extract text from PDF file."""
         def _extract():
             with open(file_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
+                reader = PdfReader(file)
                 text_parts = []
                 
                 for page_num, page in enumerate(reader.pages):
