@@ -36,3 +36,5 @@ temp/
 # My own scripts
 my-scripts/
 my-docs/
+
+api/.env

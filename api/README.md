@@ -6,7 +6,7 @@ This directory contains the complete Python backend for the Bubblebot Framework,
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.11or higher
 - pip (Python package installer)
 
 ### Installation
@@ -18,11 +18,14 @@ This directory contains the complete Python backend for the Bubblebot Framework,
 
 2. **Create a virtual environment (recommended):**
    ```bash
-   python -m venv venv
+   python3.11 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies:**
+3. **Upgrade pip:**
+pip install --upgrade pip
+
+4. **Install dependencies:**
    ```bash
    # For production
    pip install -r requirements.txt
