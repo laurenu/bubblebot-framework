@@ -5,6 +5,8 @@ This directory contains all tests for the Bubblebot API backend.
 ## Test Structure
 
 - `test_document_processor.py` - Tests for document processing functionality
+- `test_embedding_retrieval.py` - Tests for embeddings and retrieval functionality
+- `test_integration_*.py` - Integration tests (require external services)
 - `__init__.py` - Makes the tests directory a Python package
 
 ## 🚀 Quick Start
@@ -15,13 +17,15 @@ This directory contains all tests for the Bubblebot API backend.
 - Virtual environment activated
 - Development dependencies installed: `pip install -r requirements-dev.txt`
 
-### 🎯 Recommended: Use the Test Runner Script
+### 🎯 Recommended: Use the Test Runner Scripts
+
+#### Running Unit Tests (Default)
 
 For most testing needs, use the convenient `run_tests.sh` script from the api directory:
 
 ```bash
 # From the api directory
-./run_tests.sh                    # Run all tests
+./run_tests.sh                    # Run all unit tests
 ./run_tests.sh -v                 # Run with verbose output
 ./run_tests.sh -c                 # Run with coverage report
 ./run_tests.sh -c -h              # Run with coverage + HTML report
@@ -30,18 +34,34 @@ For most testing needs, use the convenient `run_tests.sh` script from the api di
 ./run_tests.sh --help             # Show all options
 ```
 
-The script automatically handles virtual environment activation and provides a user-friendly interface for common testing scenarios.
+#### Running Integration Tests
 
-### Running All Tests (Manual Commands)
+⚠️ **Important**: Integration tests make real API calls to external services (like OpenAI) and may incur costs.
+
+To run integration tests, use the dedicated integration test runner:
+
+```bash
+# From the api directory
+chmod +x run_integration_tests.sh  # Make script executable if needed
+./run_integration_tests.sh         # Run all integration tests
+```
+
+The script will:
+1. Show a warning about potential costs
+2. List which tests will be executed
+3. Ask for confirmation before proceeding
+4. Run the integration tests with coverage reporting
+
+### Running Tests Manually
 
 If you prefer to run pytest directly:
 
 ```bash
-# Run all tests
-pytest
+# Run all unit tests (excludes integration tests)
+pytest -k "not integration"
 
-# Run with verbose output
-pytest -v
+# Run integration tests (requires valid API keys)
+pytest tests/test_integration_*.py -v
 
 # Run with coverage report
 pytest --cov=app
@@ -49,6 +69,22 @@ pytest --cov=app
 # Run with coverage and generate HTML report
 pytest --cov=app --cov-report=html
 ```
+
+## Test Organization
+
+- **Unit Tests**: Test individual components in isolation with all external dependencies mocked.
+- **Integration Tests**: Test interactions between components and with external services.
+  - Located in files matching `test_integration_*.py`
+  - May make real API calls to external services
+  - Should be run separately from unit tests
+
+## Writing Tests
+
+- Place new unit tests in appropriate test files
+- Prefix integration test files with `test_integration_`
+- Use descriptive test names and docstrings
+- Mock external API calls in unit tests
+- Document any required setup for integration tests
 
 ### Running Specific Tests
 
@@ -65,8 +101,6 @@ pytest tests/test_document_processor.py::TestDocumentProcessor::test_document_ty
 # Run tests matching a pattern
 pytest -k "document_type"
 ```
-
-**Note:** Many of these commands can also be run using the `./run_tests.sh` script with appropriate flags.
 
 ### Running Tests with Different Options
 

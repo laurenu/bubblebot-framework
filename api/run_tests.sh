@@ -4,6 +4,9 @@
 # Navigate to the api directory
 cd "$(dirname "$0")"
 
+# Add the project root to PYTHONPATH
+export PYTHONPATH="$PYTHONPATH:$(pwd)"
+
 # Activate virtual environment
 source venv/bin/activate
 
@@ -13,6 +16,7 @@ VERBOSE=false
 COVERAGE=false
 HTML_REPORT=false
 STOP_ON_FAILURE=false
+INCLUDE_INTEGRATION=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -43,6 +47,10 @@ while [[ $# -gt 0 ]]; do
             TEST_MODE="keyword"
             shift 2
             ;;
+        --include-integration)
+            INCLUDE_INTEGRATION=true
+            shift
+            ;;
         --help)
             echo "🧪 Bubblebot API Test Runner"
             echo ""
@@ -55,11 +63,13 @@ while [[ $# -gt 0 ]]; do
             echo "  -x, --stop-on-failure   Stop on first test failure"
             echo "  -f, --file FILE         Run specific test file"
             echo "  -k, --keyword PATTERN   Run tests matching pattern"
+            echo "  --include-integration    Include integration tests (not recommended for CI)"
             echo "  --help                  Show this help message"
             echo ""
             echo "Examples:"
-            echo "  ./run_tests.sh                    # Run all tests"
-            echo "  ./run_tests.sh -v                 # Run all tests with verbose output"
+            echo "  ./run_tests.sh                    # Run all unit tests (excludes integration tests)"
+            echo "  ./run_tests.sh --include-integration  # Run all tests including integration tests"
+            echo "  ./run_tests.sh -v                 # Run all unit tests with verbose output"
             echo "  ./run_tests.sh -c                 # Run with coverage"
             echo "  ./run_tests.sh -c -h              # Run with coverage and HTML report"
             echo "  ./run_tests.sh -f test_document_processor.py"
@@ -97,16 +107,30 @@ fi
 # Add test target based on mode
 case $TEST_MODE in
     "all")
-        PYTEST_CMD="$PYTEST_CMD tests/"
-        echo "🧪 Running all tests..."
+        if [ "$INCLUDE_INTEGRATION" = true ]; then
+            PYTEST_CMD="$PYTEST_CMD tests/"
+            echo "🧪 Running all tests (including integration tests)..."
+            echo "⚠️  WARNING: Integration tests may make external API calls and incur costs"
+        else
+            PYTEST_CMD="$PYTEST_CMD -k 'not integration' tests/"
+            echo "🧪 Running unit tests (excluding integration tests)..."
+            echo "   Use --include-integration to run integration tests"
+        fi
         ;;
     "file")
         PYTEST_CMD="$PYTEST_CMD tests/$TEST_FILE"
         echo "🧪 Running test file: $TEST_FILE"
         ;;
     "keyword")
-        PYTEST_CMD="$PYTEST_CMD -k '$TEST_KEYWORD'"
+        if [ "$INCLUDE_INTEGRATION" = true ]; then
+            PYTEST_CMD="$PYTEST_CMD -k \"$TEST_KEYWORD\""
+        else
+            PYTEST_CMD="$PYTEST_CMD -k \"$TEST_KEYWORD and not integration\""
+        fi
         echo "🧪 Running tests matching: $TEST_KEYWORD"
+        if [ "$INCLUDE_INTEGRATION" != true ]; then
+            echo "   (excluding integration tests, use --include-integration to include them)"
+        fi
         ;;
 esac
 
@@ -114,7 +138,7 @@ esac
 echo "🚀 Starting tests with command: $PYTEST_CMD"
 echo ""
 
-$PYTEST_CMD
+eval $PYTEST_CMD
 
 # Show coverage summary if HTML report was generated
 if [ "$HTML_REPORT" = true ]; then
@@ -125,3 +149,11 @@ fi
 
 echo ""
 echo "✅ Tests completed!" 
+
+if [ "$INCLUDE_INTEGRATION" != true ] && [ "$TEST_MODE" = "all" ]; then
+    echo ""
+    echo "💡 Tip: To run integration tests (may incur API costs), use:"
+    echo "     ./run_tests.sh --include-integration"
+    echo "     or"
+    echo "     ./run_integration_tests.sh"
+fi
