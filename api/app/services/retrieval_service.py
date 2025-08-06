@@ -36,9 +36,9 @@ class RetrievalService:
     - Context window management
     """
     
-    def __init__(self):
-        """Initialize the retrieval service."""
-        self.embedding_service = EmbeddingService()
+    def __init__(self, embedding_service: Optional[EmbeddingService] = None):
+        """Initialize the retrieval service with dependency injection for EmbeddingService."""
+        self.embedding_service = embedding_service or EmbeddingService()
         self.max_context_length = settings.max_context_length
     
     async def retrieve_context(

@@ -1,20 +1,22 @@
 """
 Embedding service for generating and managing vector embeddings.
+This service uses a provider-based architecture to support multiple embedding APIs.
 """
 
-import asyncio
 import logging
-import time
-import tiktoken
-from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
+from typing import List, Tuple, Optional, Dict, Any
 
 import numpy as np
-from openai import AsyncOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.core.config import settings
 from app.services.document_processor import DocumentChunk
+from app.services.providers.base import EmbeddingProvider
+from app.services.providers.factory import create_provider_from_settings
+
+# Import provider modules to ensure they are registered with the factory
+from app.services.providers import openai_provider, gemini_provider
 
 logger = logging.getLogger(__name__)
 
@@ -39,113 +41,85 @@ class SearchResult:
 
 class EmbeddingService:
     """
-    Service for generating and managing vector embeddings using OpenAI API.
-    
-    Features:
-    - Batch processing for efficiency
-    - Token counting and cost optimization
-    - Similarity search with configurable thresholds
-    - Provider abstraction for future flexibility
+    Service for generating and managing vector embeddings using a provider model.
     """
-    
-    def __init__(self):
-        """Initialize the embedding service."""
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
-        self.model = settings.openai_embedding_model
-        self.dimensions = settings.openai_embedding_dimensions
-        self.batch_size = settings.embedding_batch_size
-        
-        # Initialize tokenizer for cost calculation
-        try:
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        except Exception as e:
-            logger.warning(f"Could not initialize tokenizer: {e}")
-            self.tokenizer = None
-    
+
+    def __init__(self, provider: EmbeddingProvider = None):
+        """
+        Initialize the embedding service.
+
+        Args:
+            provider: An optional pre-configured embedding provider. If not provided,
+                      one will be created from application settings.
+        """
+        if provider:
+            self.provider = provider
+        else:
+            # Create provider from settings
+            provider_config = {
+                "api_key": settings.embedding_provider_api_key,
+                "model": settings.embedding_provider_model,
+                "dimensions": settings.embedding_provider_dimensions,
+                "max_batch_size": settings.embedding_batch_size,
+            }
+            self.provider = create_provider_from_settings(
+                provider_name=settings.embedding_provider,
+                **provider_config,
+            )
+
+        logger.info(f"EmbeddingService initialized with provider: {self.provider.provider_name}")
+
     async def generate_embeddings(
-        self, 
-        texts: List[str], 
-        tenant_id: str
+        self, texts: List[str], tenant_id: str
     ) -> EmbeddingResult:
         """
-        Generate embeddings for a list of texts.
-        
-        Args:
-            texts: List of text strings to embed
-            tenant_id: Tenant identifier for logging
-            
-        Returns:
-            EmbeddingResult with embeddings and metadata
+        Generate embeddings for a list of texts using the configured provider.
         """
-        start_time = time.time()
-        
-        try:
-            if not texts:
-                return EmbeddingResult(
-                    success=False,
-                    embeddings=[],
-                    token_count=0,
-                    processing_time_seconds=0,
-                    error_message="No texts provided"
-                )
-            
-            # Count tokens for cost tracking
-            total_tokens = self._count_tokens(texts)
-            
-            # Process in batches to avoid rate limits
-            all_embeddings = []
-            
-            for i in range(0, len(texts), self.batch_size):
-                batch = texts[i:i + self.batch_size]
-                batch_embeddings = await self._generate_batch_embeddings(batch)
-                all_embeddings.extend(batch_embeddings)
-                
-                # Small delay between batches to respect rate limits
-                if i + self.batch_size < len(texts):
-                    await asyncio.sleep(0.1)
-            
-            processing_time = time.time() - start_time
-            
-            logger.info(
-                f"Generated {len(all_embeddings)} embeddings for tenant {tenant_id}: "
-                f"{total_tokens} tokens in {processing_time:.2f}s"
-            )
-            
-            return EmbeddingResult(
-                success=True,
-                embeddings=all_embeddings,
-                token_count=total_tokens,
-                processing_time_seconds=processing_time
-            )
-            
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {str(e)}")
+        if not texts:
             return EmbeddingResult(
                 success=False,
                 embeddings=[],
                 token_count=0,
-                processing_time_seconds=time.time() - start_time,
-                error_message=str(e)
+                processing_time_seconds=0,
+                error_message="No texts provided",
             )
-    
-    async def _generate_batch_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for a batch of texts."""
-        response = await self.client.embeddings.create(
-            model=self.model,
-            input=texts,
-            dimensions=self.dimensions
-        )
-        
-        return [item.embedding for item in response.data]
-    
-    def _count_tokens(self, texts: List[str]) -> int:
-        """Count total tokens in texts for cost estimation."""
-        if not self.tokenizer:
-            # Rough estimation: ~4 chars per token
-            return sum(len(text) for text in texts) // 4
-        
-        return sum(len(self.tokenizer.encode(text)) for text in texts)
-    
+
+        try:
+            response = await self.provider.embed_texts(texts)
+
+            logger.info(
+                f"Generated {len(response.embeddings)} embeddings for tenant {tenant_id} "
+                f"using {self.provider.provider_name}: "
+                f"{response.usage.get('total_tokens', 0)} tokens in {response.processing_time_seconds:.2f}s"
+            )
+
+            return EmbeddingResult(
+                success=True,
+                embeddings=response.embeddings,
+                token_count=response.usage.get("total_tokens", 0),
+                processing_time_seconds=response.processing_time_seconds,
+            )
+
+        except Exception as e:
+            logger.error(f"Embedding generation failed with {self.provider.provider_name}: {str(e)}")
+            return EmbeddingResult(
+                success=False,
+                embeddings=[],
+                token_count=0,
+                processing_time_seconds=0,  # This might not be accurate if it fails mid-way
+                error_message=str(e),
+            )
+
+    async def embed_query(self, query: str) -> Optional[List[float]]:
+        """
+        Generate embedding for a single query string using the configured provider.
+        """
+        try:
+            return await self.provider.embed_query(query)
+        except Exception as e:
+            logger.error(f"Query embedding failed with {self.provider.provider_name}: {str(e)}")
+            return None
+
     def find_similar_chunks(
         self, 
         query_embedding: List[float], 
@@ -165,7 +139,7 @@ class EmbeddingService:
         Returns:
             List of SearchResult objects ranked by similarity
         """
-        if not chunk_embeddings:
+        if not chunk_embeddings or query_embedding is None:
             return []
         
         threshold = threshold or settings.similarity_threshold
@@ -197,48 +171,13 @@ class EmbeddingService:
             result.rank = i + 1
         
         return results[:top_k]
-    
-    async def embed_query(self, query: str) -> Optional[List[float]]:
-        """
-        Generate embedding for a single query string.
-        
-        Args:
-            query: Query string to embed
-            
-        Returns:
-            Embedding vector or None if failed
-        """
-        try:
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=[query],
-                dimensions=self.dimensions
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            logger.error(f"Query embedding failed: {str(e)}")
-            return None
-    
+
     def calculate_embedding_cost(self, token_count: int) -> float:
         """
-        Calculate approximate cost for embedding generation.
-        
-        Args:
-            token_count: Number of tokens processed
-            
-        Returns:
-            Estimated cost in USD
+        Calculate approximate cost for embedding generation using the provider.
         """
-        # OpenAI text-embedding-3-small pricing: $0.02 per 1M tokens
-        cost_per_token = 0.02 / 1_000_000
-        return token_count * cost_per_token
-    
+        return self.provider.calculate_cost(token_count)
+
     def get_provider_info(self) -> Dict[str, Any]:
         """Get information about the current embedding provider."""
-        return {
-            "provider": "OpenAI",
-            "model": self.model,
-            "dimensions": self.dimensions,
-            "batch_size": self.batch_size,
-            "max_tokens_per_request": 8192
-        }
+        return self.provider.get_model_info()

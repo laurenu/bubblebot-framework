@@ -1,15 +1,12 @@
 """
-Unit tests for the EmbeddingService class.
+Unit tests for the EmbeddingService class using a provider-based architecture.
 """
 
 import pytest
-import asyncio
-import time
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from typing import List, Tuple
+from unittest.mock import AsyncMock, patch, Mock, MagicMock
+from typing import List, Tuple, Dict, Any
 
 import numpy as np
-from openai import AsyncOpenAI
 
 from app.services.embedding_service import (
     EmbeddingService, 
@@ -17,365 +14,213 @@ from app.services.embedding_service import (
     SearchResult
 )
 from app.services.document_processor import DocumentChunk, DocumentType
+from app.services.providers.base import EmbeddingProvider, EmbeddingResponse, ProviderAPIError
 
 
-class TestEmbeddingService:
-    """Test suite for EmbeddingService."""
-    
-    @pytest.fixture
-    def embedding_service(self):
-        """Create an EmbeddingService instance for testing."""
-        with patch('app.services.embedding_service.settings') as mock_settings:
-            mock_settings.openai_api_key = "test-api-key"
-            mock_settings.openai_embedding_model = "text-embedding-3-small"
-            mock_settings.openai_embedding_dimensions = 1536
-            mock_settings.embedding_batch_size = 100
-            mock_settings.similarity_threshold = 0.7
-            
-            service = EmbeddingService()
-            return service
-    
-    @pytest.fixture
-    def sample_document_chunks(self):
-        """Create sample DocumentChunk objects for testing."""
-        return [
-            DocumentChunk(
-                content="This is the first chunk of content.",
-                chunk_index=0,
-                source_file="doc1.pdf",
-                document_type=DocumentType.PDF,
-                metadata={"page_number": 1, "created_at": "2024-01-01T00:00:00Z"},
-                word_count=8
-            ),
-            DocumentChunk(
-                content="This is the second chunk with different content.",
-                chunk_index=1,
-                source_file="doc1.pdf",
-                document_type=DocumentType.PDF,
-                metadata={"page_number": 1, "created_at": "2024-01-01T00:00:00Z"},
-                word_count=9
-            ),
-            DocumentChunk(
-                content="Another document with completely different information.",
-                chunk_index=0,
-                source_file="doc2.pdf",
-                document_type=DocumentType.PDF,
-                metadata={"page_number": 1, "created_at": "2024-01-01T00:00:00Z"},
-                word_count=8
-            )
-        ]
+@pytest.fixture
+def mock_embedding_provider() -> MagicMock:
+    """Create a mock EmbeddingProvider."""
+    mock_provider = MagicMock(spec=EmbeddingProvider)
+    mock_provider.embed_texts = AsyncMock()
+    mock_provider.embed_query = AsyncMock()
+    mock_provider.calculate_cost = MagicMock()
+    mock_provider.get_model_info = MagicMock()
+    mock_provider.provider_name = "mock_provider"
+    return mock_provider
+
+
+@pytest.fixture
+def embedding_service(mock_embedding_provider: MagicMock) -> EmbeddingService:
+    """Create an EmbeddingService instance with a mock provider."""
+    with patch('app.services.embedding_service.settings') as mock_settings:
+        mock_settings.similarity_threshold = 0.7
+        # The service is initialized with the mock provider directly
+        return EmbeddingService(provider=mock_embedding_provider)
+
+
+@pytest.fixture
+def sample_document_chunks() -> List[DocumentChunk]:
+    """Create sample DocumentChunk objects for testing."""
+    return [
+        DocumentChunk(
+            content="This is the first chunk.",
+            chunk_index=0, source_file="doc1.pdf", document_type=DocumentType.PDF,
+            metadata={"page": 1}, word_count=5
+        ),
+        DocumentChunk(
+            content="This is the second chunk.",
+            chunk_index=1, source_file="doc1.pdf", document_type=DocumentType.PDF,
+            metadata={"page": 1}, word_count=5
+        ),
+        DocumentChunk(
+            content="A completely different document.",
+            chunk_index=0, source_file="doc2.pdf", document_type=DocumentType.PDF,
+            metadata={"page": 1}, word_count=4
+        )
+    ]
+
+
+class TestEmbeddingServiceWithProvider:
+    """Test suite for EmbeddingService with a mocked provider."""
 
     @pytest.mark.asyncio
-    async def test_generate_embeddings_success(self, embedding_service):
-        """Test successful embedding generation."""
-        texts = ["Hello world", "How are you?", "Test text"]
+    async def test_generate_embeddings_success(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test successful embedding generation via the provider."""
+        texts = ["Hello world", "How are you?"]
         tenant_id = "test-tenant"
+        mock_embeddings = [[0.1, 0.2], [0.3, 0.4]]
         
-        # Mock the OpenAI client response
-        mock_response = Mock()
-        mock_response.data = [
-            Mock(embedding=[0.1, 0.2, 0.3]),
-            Mock(embedding=[0.4, 0.5, 0.6]),
-            Mock(embedding=[0.7, 0.8, 0.9])
-        ]
-        
-        embedding_service.client.embeddings.create = AsyncMock(return_value=mock_response)
-        
-        # Mock tokenizer
-        embedding_service.tokenizer = Mock()
-        embedding_service.tokenizer.encode = Mock(side_effect=lambda x: [1] * len(x.split()))
+        # Mock the provider's response
+        mock_provider_response = EmbeddingResponse(
+            embeddings=mock_embeddings,
+            model="mock-model",
+            usage={'total_tokens': 5},
+            processing_time_seconds=0.5
+        )
+        mock_embedding_provider.embed_texts.return_value = mock_provider_response
         
         result = await embedding_service.generate_embeddings(texts, tenant_id)
         
+        # Assert that the service called the provider correctly
+        mock_embedding_provider.embed_texts.assert_called_once_with(texts)
+        
+        # Assert that the service correctly returns data from the provider's response
         assert result.success is True
-        assert len(result.embeddings) == 3
-        assert result.embeddings[0] == [0.1, 0.2, 0.3]
-        assert result.token_count == 7  # Sum of word counts (2 + 3 + 2)
-        assert result.processing_time_seconds > 0
+        assert result.embeddings == mock_embeddings
+        assert result.token_count == 5
+        assert result.processing_time_seconds == 0.5
         assert result.error_message is None
 
     @pytest.mark.asyncio
-    async def test_generate_embeddings_empty_texts(self, embedding_service):
-        """Test embedding generation with empty text list."""
+    async def test_generate_embeddings_empty_texts(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test that the service handles empty text lists before calling the provider."""
         result = await embedding_service.generate_embeddings([], "test-tenant")
         
         assert result.success is False
-        assert result.embeddings == []
-        assert result.token_count == 0
         assert result.error_message == "No texts provided"
+        mock_embedding_provider.embed_texts.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_generate_embeddings_api_error(self, embedding_service):
-        """Test embedding generation with API error."""
+    async def test_generate_embeddings_provider_error(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test how the service handles errors from the provider."""
         texts = ["Hello world"]
-        tenant_id = "test-tenant"
+        error_message = "Provider API Error"
+        mock_embedding_provider.embed_texts.side_effect = ProviderAPIError(error_message)
         
-        embedding_service.client.embeddings.create = AsyncMock(
-            side_effect=Exception("API Error")
-        )
-        
-        result = await embedding_service.generate_embeddings(texts, tenant_id)
+        result = await embedding_service.generate_embeddings(texts, "test-tenant")
         
         assert result.success is False
         assert result.embeddings == []
-        assert result.error_message == "API Error"
+        assert result.error_message == error_message
 
     @pytest.mark.asyncio
-    async def test_generate_batch_embeddings(self, embedding_service):
-        """Test batch embedding generation."""
-        texts = ["text1", "text2"]
-        
-        mock_response = Mock()
-        mock_response.data = [
-            Mock(embedding=[0.1, 0.2]),
-            Mock(embedding=[0.3, 0.4])
-        ]
-        
-        embedding_service.client.embeddings.create = AsyncMock(return_value=mock_response)
-        
-        result = await embedding_service._generate_batch_embeddings(texts)
-        
-        assert result == [[0.1, 0.2], [0.3, 0.4]]
-        embedding_service.client.embeddings.create.assert_called_once_with(
-            model=embedding_service.model,
-            input=texts,
-            dimensions=embedding_service.dimensions
-        )
-
-    def test_count_tokens_with_tokenizer(self, embedding_service):
-        """Test token counting with tokenizer available."""
-        texts = ["Hello world", "How are you?"]
-        
-        embedding_service.tokenizer = Mock()
-        embedding_service.tokenizer.encode = Mock(side_effect=lambda x: [1] * len(x.split()))
-        
-        token_count = embedding_service._count_tokens(texts)
-        
-        assert token_count == 5  # 2 + 3 words
-        assert embedding_service.tokenizer.encode.call_count == 2
-
-    def test_count_tokens_without_tokenizer(self, embedding_service):
-        """Test token counting without tokenizer (estimation)."""
-        texts = ["Hello world", "Test"]
-        embedding_service.tokenizer = None
-        
-        token_count = embedding_service._count_tokens(texts)
-        
-        # Rough estimation: total chars / 4
-        expected = (len("Hello world") + len("Test")) // 4
-        assert token_count == expected
-
-    def test_find_similar_chunks_success(self, embedding_service, sample_document_chunks):
-        """Test successful similarity search."""
-        query_embedding = [0.5, 0.5, 0.5]
-        chunk_embeddings = [
-            (sample_document_chunks[0], [0.6, 0.4, 0.5]),  # similarity ≈ 0.92
-            (sample_document_chunks[1], [0.1, 0.2, 0.3]),  # similarity ≈ 0.58
-            (sample_document_chunks[2], [0.8, 0.9, 0.7])   # similarity ≈ 0.98
-        ]
-        
-        results = embedding_service.find_similar_chunks(
-            query_embedding=query_embedding,
-            chunk_embeddings=chunk_embeddings,
-            top_k=3,
-            threshold=0.5
-        )
-        
-        assert len(results) == 3
-        # Results should be sorted by similarity (descending)
-        assert results[0].chunk == sample_document_chunks[2]  # Highest similarity
-        assert results[0].rank == 1
-        assert results[1].chunk == sample_document_chunks[0]
-        assert results[1].rank == 2
-        assert all(r.similarity_score >= 0.5 for r in results)
-
-    def test_find_similar_chunks_with_threshold(self, embedding_service, sample_document_chunks):
-        """Test similarity search with threshold filtering."""
-        query_embedding = [0.5, 0.5, 0.5]
-        chunk_embeddings = [
-            (sample_document_chunks[0], [0.6, 0.4, 0.5]),  # similarity ≈ 0.99
-            (sample_document_chunks[1], [0.1, 0.2, 0.3]),  # similarity ≈ 0.93
-            (sample_document_chunks[2], [0.0, 0.1, 0.0])   # similarity ≈ 0.58
-        ]
-        
-        results = embedding_service.find_similar_chunks(
-            query_embedding=query_embedding,
-            chunk_embeddings=chunk_embeddings,
-            top_k=3,
-            threshold=0.6
-        )
-        
-        # Only chunks with similarity >= 0.6 should be returned
-        assert len(results) == 2
-        assert results[0].chunk == sample_document_chunks[0]
-
-    def test_find_similar_chunks_empty_input(self, embedding_service):
-        """Test similarity search with empty chunk list."""
-        query_embedding = [0.5, 0.5, 0.5]
-        
-        results = embedding_service.find_similar_chunks(
-            query_embedding=query_embedding,
-            chunk_embeddings=[],
-            top_k=5
-        )
-        
-        assert results == []
-
-    @pytest.mark.asyncio
-    async def test_embed_query_success(self, embedding_service):
-        """Test successful query embedding."""
-        query = "What is the weather like?"
-        
-        mock_response = Mock()
-        mock_response.data = [Mock(embedding=[0.1, 0.2, 0.3])]
-        embedding_service.client.embeddings.create = AsyncMock(return_value=mock_response)
+    async def test_embed_query_success(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test successful query embedding via the provider."""
+        query = "What is the weather?"
+        mock_embedding = [0.1, 0.2, 0.3]
+        mock_embedding_provider.embed_query.return_value = mock_embedding
         
         result = await embedding_service.embed_query(query)
         
-        assert result == [0.1, 0.2, 0.3]
-        embedding_service.client.embeddings.create.assert_called_once_with(
-            model=embedding_service.model,
-            input=[query],
-            dimensions=embedding_service.dimensions
-        )
+        mock_embedding_provider.embed_query.assert_called_once_with(query)
+        assert result == mock_embedding
 
     @pytest.mark.asyncio
-    async def test_embed_query_failure(self, embedding_service):
-        """Test query embedding failure."""
+    async def test_embed_query_failure(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test query embedding failure from the provider."""
         query = "Test query"
-        
-        embedding_service.client.embeddings.create = AsyncMock(
-            side_effect=Exception("API Error")
-        )
+        mock_embedding_provider.embed_query.side_effect = ProviderAPIError("API Error")
         
         result = await embedding_service.embed_query(query)
         
         assert result is None
 
-    def test_calculate_embedding_cost(self, embedding_service):
-        """Test embedding cost calculation."""
+    def test_find_similar_chunks_success(self, embedding_service: EmbeddingService, sample_document_chunks: List[DocumentChunk]):
+        """Test successful similarity search logic, which remains in the service."""
+        query_embedding = [1.0, 0.0, 0.0]
+        chunk_embeddings = [
+            (sample_document_chunks[0], [0.9, 0.1, 0.1]),  # High similarity
+            (sample_document_chunks[1], [0.0, 1.0, 0.0]),  # Low similarity (orthogonal)
+            (sample_document_chunks[2], [0.8, 0.2, 0.1])   # Medium similarity
+        ]
+    
+        results = embedding_service.find_similar_chunks(
+            query_embedding=query_embedding, chunk_embeddings=chunk_embeddings, top_k=3, threshold=0.5
+        )
+    
+        assert len(results) == 2  # The orthogonal chunk should be filtered out
+        assert results[0].chunk == sample_document_chunks[0]
+        assert results[0].rank == 1
+        assert results[1].chunk == sample_document_chunks[2]
+        assert results[1].rank == 2
+
+    def test_find_similar_chunks_with_threshold(self, embedding_service: EmbeddingService, sample_document_chunks: List[DocumentChunk]):
+        """Test similarity search with a higher threshold."""
+        query_embedding = [1.0, 0.0, 0.0]
+        chunk_embeddings = [
+            (sample_document_chunks[0], [1.0, 0.0, 0.0]),  # Perfect similarity
+            (sample_document_chunks[1], [0.8, 0.2, 0.0]),  # High similarity, but below threshold
+        ]
+    
+        results = embedding_service.find_similar_chunks(
+            query_embedding=query_embedding, chunk_embeddings=chunk_embeddings, top_k=2, threshold=0.99
+        )
+    
+        assert len(results) == 1 # Only the perfect match should be returned
+        assert results[0].chunk == sample_document_chunks[0]
+
+    def test_find_similar_chunks_empty_input(self, embedding_service: EmbeddingService):
+        """Test find_similar_chunks with empty inputs."""
+        assert embedding_service.find_similar_chunks([0.1], []) == []
+        assert embedding_service.find_similar_chunks(None, [Mock()]) == []
+
+    def test_calculate_embedding_cost(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test that the service delegates cost calculation to the provider."""
         token_count = 1000
-        expected_cost = token_count * (0.02 / 1_000_000)  # $0.02 per 1M tokens
+        expected_cost = 0.0002
+        mock_embedding_provider.calculate_cost.return_value = expected_cost
         
         cost = embedding_service.calculate_embedding_cost(token_count)
         
+        mock_embedding_provider.calculate_cost.assert_called_once_with(token_count)
         assert cost == expected_cost
 
-    def test_get_provider_info(self, embedding_service):
-        """Test provider information retrieval."""
+    def test_get_provider_info(self, embedding_service: EmbeddingService, mock_embedding_provider: MagicMock):
+        """Test that the service delegates provider info retrieval."""
+        expected_info = {"provider": "mock_provider", "model": "mock-model"}
+        mock_embedding_provider.get_model_info.return_value = expected_info
+        
         info = embedding_service.get_provider_info()
         
-        expected_info = {
-            "provider": "OpenAI",
-            "model": embedding_service.model,
-            "dimensions": embedding_service.dimensions,
-            "batch_size": embedding_service.batch_size,
-            "max_tokens_per_request": 8192
-        }
-        
+        mock_embedding_provider.get_model_info.assert_called_once()
         assert info == expected_info
 
-    @pytest.mark.asyncio
-    async def test_batch_processing_with_delay(self, embedding_service):
-        """Test that batch processing includes delays between batches."""
-        # Create texts that will require multiple batches
-        embedding_service.batch_size = 2
-        texts = ["text1", "text2", "text3", "text4", "text5"]
-        
-        # Create a side_effect that returns the correct number of embeddings for each batch
-        def mock_embeddings_create(*args, **kwargs):
-            batch_size = len(kwargs['input'])
-            mock_response = Mock()
-            mock_response.data = [Mock(embedding=[0.1, 0.2]) for _ in range(batch_size)]
-            return mock_response
-            
-        embedding_service.client.embeddings.create = AsyncMock(side_effect=mock_embeddings_create)
-        
-        # Mock tokenizer
-        embedding_service.tokenizer = Mock()
-        embedding_service.tokenizer.encode = Mock(return_value=[1])
-        
-        with patch('asyncio.sleep') as mock_sleep:
-            start_time = time.time()
-            result = await embedding_service.generate_embeddings(texts, "tenant")
-            end_time = time.time()
-            
-            # Should have called sleep between batches (3 batches total, 2 sleep calls)
-            assert mock_sleep.call_count == 2
-            mock_sleep.assert_called_with(0.1)
-            
-        assert result.success is True
-        assert len(result.embeddings) == 5  # Should match the number of input texts
+    def test_initialization_from_settings(self):
+        """Test that the service can be initialized from settings using the factory."""
+        with patch('app.services.embedding_service.create_provider_from_settings') as mock_create_provider:
+            with patch('app.services.embedding_service.settings') as mock_settings:
+                # Set up mock settings
+                mock_settings.embedding_provider = "openai"
+                mock_settings.embedding_provider_api_key = "test_key"
+                mock_settings.embedding_provider_model = "test_model"
+                mock_settings.embedding_provider_dimensions = 128
+                mock_settings.embedding_batch_size = 50
 
-    def test_search_result_dataclass(self, sample_document_chunks):
-        """Test SearchResult dataclass functionality."""
-        chunk = sample_document_chunks[0]
-        similarity_score = 0.85
-        rank = 1
-        
-        result = SearchResult(
-            chunk=chunk,
-            similarity_score=similarity_score,
-            rank=rank
-        )
-        
-        assert result.chunk == chunk
-        assert result.similarity_score == similarity_score
-        assert result.rank == rank
+                # Create the service, which should trigger the factory
+                service = EmbeddingService(provider=None)
 
-    def test_embedding_result_dataclass(self):
-        """Test EmbeddingResult dataclass functionality."""
-        embeddings = [[0.1, 0.2], [0.3, 0.4]]
-        token_count = 10
-        processing_time = 1.5
-        
-        result = EmbeddingResult(
-            success=True,
-            embeddings=embeddings,
-            token_count=token_count,
-            processing_time_seconds=processing_time
-        )
-        
-        assert result.success is True
-        assert result.embeddings == embeddings
-        assert result.token_count == token_count
-        assert result.processing_time_seconds == processing_time
-        assert result.error_message is None
-
-    @pytest.mark.asyncio
-    async def test_initialization_without_tokenizer(self):
-        """Test service initialization when tokenizer fails to load."""
-        with patch('app.services.embedding_service.settings') as mock_settings:
-            mock_settings.openai_api_key = "test-api-key"
-            mock_settings.openai_embedding_model = "text-embedding-3-small"
-            mock_settings.openai_embedding_dimensions = 1536
-            mock_settings.embedding_batch_size = 100
-            
-            with patch('tiktoken.get_encoding', side_effect=Exception("Tokenizer error")):
-                service = EmbeddingService()
-                assert service.tokenizer is None
-
-    def test_cosine_similarity_calculation(self, embedding_service):
-        """Test that cosine similarity is calculated correctly."""
-        # Known vectors with expected similarity
-        query_embedding = [1.0, 0.0, 0.0]
-        chunk_embeddings = [
-            (Mock(), [1.0, 0.0, 0.0]),  # Same vector, similarity = 1.0
-            (Mock(), [0.0, 1.0, 0.0]),  # Orthogonal, similarity = 0.0
-            (Mock(), [-1.0, 0.0, 0.0])  # Opposite, similarity = -1.0
-        ]
-        
-        results = embedding_service.find_similar_chunks(
-            query_embedding=query_embedding,
-            chunk_embeddings=chunk_embeddings,
-            top_k=3,
-            threshold=-1.0  # Include all results
-        )
-        
-        # Check that similarities are calculated correctly
-        assert abs(results[0].similarity_score - 1.0) < 1e-6  # First result should be 1.0
-        assert abs(results[1].similarity_score - 0.0) < 1e-6  # Second result should be 0.0
-        assert abs(results[2].similarity_score - (-1.0)) < 1e-6  # Third result should be -1.0
+                # Verify the factory was called with the correct config
+                expected_config = {
+                    "api_key": "test_key",
+                    "model": "test_model",
+                    "dimensions": 128,
+                    "max_batch_size": 50,
+                }
+                mock_create_provider.assert_called_once_with(
+                    provider_name="openai",
+                    **expected_config
+                )
+                assert service.provider == mock_create_provider.return_value
 
 
 if __name__ == "__main__":

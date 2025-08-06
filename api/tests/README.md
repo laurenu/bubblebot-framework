@@ -1,201 +1,143 @@
 # Testing Guide 🧪
 
-This directory contains all tests for the Bubblebot API backend.
+This guide covers the testing strategy and how to run tests for the Bubblebot Framework.
 
-## Test Structure
+## Test Types
 
-- `test_document_processor.py` - Tests for document processing functionality
-- `test_embedding_retrieval.py` - Tests for embeddings and retrieval functionality
-- `test_integration_*.py` - Integration tests (require external services)
-- `__init__.py` - Makes the tests directory a Python package
+### Unit Tests
 
-## 🚀 Quick Start
+Unit tests verify individual components in isolation using mocks. These tests:
+- Are fast and reliable
+- Don't make external API calls
+- Should cover all major code paths
+- Are run by default with `pytest`
 
-### Prerequisites
+### Integration Tests
 
-- Python 3.8 or higher
-- Virtual environment activated
-- Development dependencies installed: `pip install -r requirements-dev.txt`
+Integration tests verify that components work together correctly. These tests:
+- May make real API calls to external services
+- May incur costs on your provider account
+- Require valid API credentials
+- Are excluded by default
 
-### 🎯 Recommended: Use the Test Runner Scripts
+## Running Tests
 
-#### Running Unit Tests (Default)
-
-For most testing needs, use the convenient `run_tests.sh` script from the api directory:
-
-```bash
-# From the api directory
-./run_tests.sh                    # Run all unit tests
-./run_tests.sh -v                 # Run with verbose output
-./run_tests.sh -c                 # Run with coverage report
-./run_tests.sh -c -h              # Run with coverage + HTML report
-./run_tests.sh -f test_document_processor.py  # Run specific file
-./run_tests.sh -k 'document_type'             # Run tests matching pattern
-./run_tests.sh --help             # Show all options
-```
-
-#### Running Integration Tests
-
-⚠️ **Important**: Integration tests make real API calls to external services (like OpenAI) and may incur costs.
-
-To run integration tests, use the dedicated integration test runner:
-
-```bash
-# From the api directory
-chmod +x run_integration_tests.sh  # Make script executable if needed
-./run_integration_tests.sh         # Run all integration tests
-```
-
-The script will:
-1. Show a warning about potential costs
-2. List which tests will be executed
-3. Ask for confirmation before proceeding
-4. Run the integration tests with coverage reporting
-
-### Running Tests Manually
-
-If you prefer to run pytest directly:
+### Running All Unit Tests
 
 ```bash
 # Run all unit tests (excludes integration tests)
-pytest -k "not integration"
+./run_tests.sh
 
-# Run integration tests (requires valid API keys)
-pytest tests/test_integration_*.py -v
-
-# Run with coverage report
-pytest --cov=app
-
-# Run with coverage and generate HTML report
-pytest --cov=app --cov-report=html
+# With verbose output
+./run_tests.sh -v
 ```
 
-## Test Organization
+### Running Integration Tests
 
-- **Unit Tests**: Test individual components in isolation with all external dependencies mocked.
-- **Integration Tests**: Test interactions between components and with external services.
-  - Located in files matching `test_integration_*.py`
-  - May make real API calls to external services
-  - Should be run separately from unit tests
+⚠️ **Warning**: Integration tests make real API calls that may incur costs.
 
-## Writing Tests
+```bash
+# Run all tests, including integration tests
+./run_integration_tests.sh
 
-- Place new unit tests in appropriate test files
-- Prefix integration test files with `test_integration_`
-- Use descriptive test names and docstrings
-- Mock external API calls in unit tests
-- Document any required setup for integration tests
+# You'll be prompted to confirm before any API calls are made
+```
 
 ### Running Specific Tests
 
+Run tests in a specific file:
 ```bash
-# Run a specific test file
-pytest tests/test_document_processor.py
-
-# Run a specific test class
-pytest tests/test_document_processor.py::TestDocumentProcessor
-
-# Run a specific test method
-pytest tests/test_document_processor.py::TestDocumentProcessor::test_document_type_detection
-
-# Run tests matching a pattern
-pytest -k "document_type"
+pytest tests/test_embedding_service.py
 ```
 
-### Running Tests with Different Options
-
+Run a specific test class or method:
 ```bash
-# Run tests in parallel (if pytest-xdist is installed)
-pytest -n auto
+pytest tests/test_retrieval_service.py::TestRetrievalService
+pytest tests/test_retrieval_service.py::TestRetrievalService::test_retrieve_context_success
+```
 
-# Stop on first failure
-pytest -x
+Run tests by marker:
+```bash
+# Run only fast tests
+pytest -m "not slow"
 
-# Show local variables in tracebacks
-pytest -l
-
-# Run tests with asyncio support (for async tests)
-pytest --asyncio-mode=auto
+# Run only integration tests
+pytest -m "integration"
 ```
 
 ### Test Coverage
 
+Generate a coverage report:
 ```bash
-# Generate coverage report
 pytest --cov=app --cov-report=term-missing
-
-# Generate HTML coverage report (creates htmlcov/ directory)
-pytest --cov=app --cov-report=html
-
-# Generate XML coverage report (for CI/CD)
-pytest --cov=app --cov-report=xml
 ```
 
-**Note:** The `./run_tests.sh -c -h` command provides an easy way to generate coverage reports.
+## Writing Tests
 
-## 🐛 Debugging Tests
+### Test Organization
 
-### Running Tests in Debug Mode
+- Unit tests are co-located with the code they test in the `tests/` directory
+- Test files are named `test_*.py`
+- Test classes are named `Test*`
+- Test methods are named `test_*`
+
+### Fixtures
+
+Common test fixtures are defined in `conftest.py`. These include:
+
+- `mock_embedding_provider`: A mock embedding provider for unit tests
+- `sample_document_chunks`: Sample document chunks for testing
+- `sample_embeddings`: Sample embeddings for testing
+
+### Best Practices
+
+1. **Isolation**: Each test should be independent
+2. **Determinism**: Tests should produce the same results every time
+3. **Descriptive Names**: Test names should describe what they test
+4. **Mocks**: Use mocks for external dependencies in unit tests
+5. **Cleanup**: Clean up any test data after each test
+
+## Integration Test Details
+
+### Cost Considerations
+
+Integration tests may make real API calls to external services, which could incur costs. The test runner will warn you before running these tests.
+
+### Environment Setup
+
+For integration tests to work, you'll need to set up the appropriate environment variables:
 
 ```bash
-# Run with detailed output
-pytest -vvv
+# For OpenAI provider
+EMBEDDING_PROVIDER=openai
+EMBEDDING_PROVIDER_API_KEY=your_openai_api_key
 
-# Run with print statement output
-pytest -s
-
-# Run a single test with debugger
-python -m pytest tests/test_document_processor.py::TestDocumentProcessor::test_document_type_detection -s
+# For Gemini provider
+EMBEDDING_PROVIDER=gemini
+EMBEDDING_PROVIDER_API_KEY=your_gemini_api_key
 ```
 
-### Common Test Issues
+### Skipping Integration Tests
 
-1. **Import Errors**: Make sure you're in the correct directory and virtual environment is activated
-2. **Async Test Issues**: Ensure `pytest-asyncio` is installed and `@pytest.mark.asyncio` decorators are used
-3. **File Path Issues**: Tests use temporary files, ensure proper cleanup in fixtures
+To skip integration tests:
 
-## 📊 Test Results
+```bash
+# Skip all integration tests
+pytest -k "not integration"
 
-After running tests, you'll see output similar to:
-
-```
-============================= test session starts ==============================
-platform darwin -- Python 3.9.7, pytest-7.4.3, pluggy-1.3.0
-rootdir: /path/to/bubblebot-framework/api
-plugins: asyncio-0.21.1, cov-4.1.0
-collected 15 items
-
-tests/test_document_processor.py ................                    [100%]
-
-============================== 15 passed in 2.34s ==============================
+# Or use the run_tests.sh script
+./run_tests.sh
 ```
 
-## 🔧 Test Configuration
+## Debugging Tests
 
-Tests use pytest configuration. You can create a `pytest.ini` file in the api directory for custom settings:
+To drop into the debugger on test failures:
 
-```ini
-[tool:pytest]
-asyncio_mode = auto
-testpaths = tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts = -v --tb=short
+```bash
+pytest --pdb
 ```
 
-## 🤝 Contributing
+For more verbose output:
 
-When adding new tests:
-
-1. Follow the existing naming convention: `test_*.py` for files, `test_*` for functions
-2. Use descriptive test names that explain what is being tested
-3. Add appropriate fixtures for reusable test data
-4. Include both unit tests and integration tests where appropriate
-5. Ensure tests are isolated and don't depend on external state
-
-## 📚 Additional Resources
-
-- [pytest Documentation](https://docs.pytest.org/)
-- [pytest-asyncio Documentation](https://pytest-asyncio.readthedocs.io/)
-- [Python Testing Best Practices](https://realpython.com/python-testing/) 
+```bash
+pytest -v

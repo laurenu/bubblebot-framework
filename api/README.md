@@ -2,11 +2,34 @@
 
 This directory contains the complete Python backend for the Bubblebot Framework, including document processing services, models, utilities, and API endpoints.
 
+## 🏗️ Architecture
+
+The API is built with FastAPI and follows a clean architecture with these key components:
+
+- **Document Processor**: Handles document ingestion, chunking, and text extraction
+- **Embedding Service**: Manages text embeddings using pluggable providers
+- **Retrieval Service**: Handles similarity search and context building
+- **Provider System**: Abstract base classes for different AI providers
+
+### Provider Architecture
+
+The system uses a provider-agnostic design:
+
+```
+services/
+└── providers/
+    ├── __init__.py
+    ├── base.py         # Abstract base classes
+    ├── factory.py      # Provider factory
+    ├── openai/         # OpenAI provider implementation
+    └── gemini/         # Gemini provider implementation
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.11or higher
+- Python 3.11 or higher
 - pip (Python package installer)
 
 ### Installation
@@ -66,6 +89,32 @@ The project includes convenient scripts for common development tasks:
 
 For detailed testing information, see [tests/README.md](tests/README.md).
 
+## 🧪 Testing
+
+### Unit Tests
+
+Run all unit tests (excludes integration tests by default):
+
+```bash
+./run_tests.sh
+```
+
+### Integration Tests
+
+Integration tests make real API calls to external services and may incur costs. You'll be prompted for confirmation before running them:
+
+```bash
+./run_integration_tests.sh
+```
+
+### Test Coverage
+
+To run tests with coverage report:
+
+```bash
+pytest --cov=app --cov-report=term-missing tests/
+```
+
 ## 🏗️ Development
 
 ### Code Quality Tools
@@ -96,6 +145,28 @@ pre-commit install
 
 # Run all hooks manually
 pre-commit run --all-files
+```
+
+### Adding a New Provider
+
+1. Create a new provider module in `app/services/providers/`
+2. Implement the required abstract methods from `BaseEmbeddingProvider`
+3. Update the provider factory to support your new provider
+4. Add tests for your provider implementation
+
+### Code Style
+
+This project uses:
+- Black for code formatting
+- isort for import sorting
+- flake8 for linting
+
+Run formatting and linting:
+
+```bash
+black .
+isort .
+flake8
 ```
 
 ## 📁 Project Structure
@@ -134,12 +205,6 @@ LOG_LEVEL=INFO
 MAX_FILE_SIZE_MB=10
 ```
 
-## 🧪 Testing
-
-For comprehensive testing information, see [tests/README.md](tests/README.md).
-
-**Quick start:** Use the `./run_tests.sh` script for all testing needs.
-
 ## 🤝 Contributing
 
 When contributing to the backend:
@@ -155,3 +220,7 @@ When contributing to the backend:
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Python Best Practices](https://realpython.com/python-best-practices/)
 - [Testing Guide](tests/README.md) 
+
+## 📝 License
+
+MIT
