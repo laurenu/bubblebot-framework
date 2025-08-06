@@ -1,30 +1,102 @@
 # Bubblebot Framework 🫧
 
-TBD
+A flexible, provider-agnostic framework for document processing, embedding, and retrieval with support for multiple AI providers.
 
-## 🏗️ Project Overview
+## Features
 
-TBD
+- **Multi-provider Support**: Easily switch between different embedding providers (OpenAI, Gemini, etc.)
+- **Document Processing**: Process various document formats (TXT, PDF, etc.) with automatic chunking
+- **Vector Search**: Efficient similarity search for document chunks
+- **REST API**: Easy integration with other services
+- **Tested**: Comprehensive test suite with unit and integration tests
 
-## 📁 Project Structure
+## Architecture
 
 ```
 bubblebot-framework/
-├── api/                   # Python backend API
-│   ├── app/              # Main application code
-│   ├── tests/            # Backend tests
-│   ├── notebooks/        # Jupyter demos
-│   ├── start_server.sh   # Server startup script
-│   ├── stop_server.sh    # Server shutdown script
-│   ├── run_tests.sh      # Test runner script
-│   └── README.md         # Backend documentation
-├── web/                  # Frontend web application (coming soon)
-│   └── src/              # Frontend source code
-├── shared/               # Shared configurations and types
-├── docs/                 # Project documentation
-├── examples/             # Usage examples and integrations
+├── api/                   # FastAPI application
+│   ├── app/              
+│   │   ├── core/         # Core configuration and utilities
+│   │   ├── models/       # Pydantic models
+│   │   ├── services/     # Business logic
+│   │   │   └── providers/ # Provider implementations
+│   │   └── tests/        # Test files
+│   └── requirements.txt  # Python dependencies
 └── README.md            # This file
 ```
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.9+
+- pip
+- Virtual environment (recommended)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/bubblebot-framework.git
+   cd bubblebot-framework/api
+   ```
+
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+### Running Tests
+
+Run unit tests:
+```bash
+./run_tests.sh
+```
+
+Run integration tests (may incur API costs):
+```bash
+./run_integration_tests.sh
+```
+
+### Starting the Server
+
+```bash
+./start_server.sh
+```
+
+The API will be available at `http://localhost:8000`
+
+## Configuration
+
+Edit the `.env` file to configure:
+- Embedding provider (OpenAI, Gemini, etc.)
+- API keys
+- Model settings
+- Batch sizes and other parameters
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+MIT
 
 ## 🚀 Quick Start
 
